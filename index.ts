@@ -147,28 +147,12 @@ function filterByOccasion(items: OutfitItem[], occasion: string) {
   return filtered.length > 0 ? filtered : items;
 }
 
-function normalizeBaseUrl(baseUrl: string) {
-  if (baseUrl.includes("0.0.0.0")) {
-    return baseUrl.replace("0.0.0.0", "localhost");
-  }
-  return baseUrl;
-}
-
-function withImageUrl(item: OutfitItem, baseUrl: string) {
-  if (item.imagePath.startsWith("http://") || item.imagePath.startsWith("https://")) {
-    return {
-      id: item.id,
-      name: item.name,
-      description: item.description,
-      imageUrl: item.imagePath,
-    };
-  }
-  const normalizedBaseUrl = normalizeBaseUrl(baseUrl);
+function withImagePath(item: OutfitItem) {
   return {
     id: item.id,
     name: item.name,
     description: item.description,
-    imageUrl: `${normalizedBaseUrl}${item.imagePath}`,
+    imagePath: item.imagePath,
   };
 }
 
@@ -193,7 +177,6 @@ server.tool(
     },
   },
   async ({ occasion, topId, bottomId, shoesId }) => {
-    const baseUrl = process.env.MCP_URL || "http://localhost:3000";
     const top = allItems.find((item) => item.id === topId);
     const bottom = allItems.find((item) => item.id === bottomId);
     const shoesItem = allItems.find((item) => item.id === shoesId);
@@ -207,9 +190,9 @@ server.tool(
     return widget({
       props: {
         occasion,
-        top: withImageUrl(top, baseUrl),
-        bottom: withImageUrl(bottom, baseUrl),
-        shoes: withImageUrl(shoesItem, baseUrl),
+        top: withImagePath(top),
+        bottom: withImagePath(bottom),
+        shoes: withImagePath(shoesItem),
       },
       output: text("Outfit images ready"),
     });
@@ -268,7 +251,6 @@ server.tool(
     }),
   },
   async ({ topId, bottomId, shoesId }) => {
-    const baseUrl = process.env.MCP_URL || "http://localhost:3000";
     const top = allItems.find((item) => item.id === topId);
     const bottom = allItems.find((item) => item.id === bottomId);
     const shoesItem = allItems.find((item) => item.id === shoesId);
@@ -280,9 +262,9 @@ server.tool(
     }
 
     return object({
-      top: withImageUrl(top, baseUrl),
-      bottom: withImageUrl(bottom, baseUrl),
-      shoes: withImageUrl(shoesItem, baseUrl),
+      top: withImagePath(top),
+      bottom: withImagePath(bottom),
+      shoes: withImagePath(shoesItem),
     });
   }
 );
