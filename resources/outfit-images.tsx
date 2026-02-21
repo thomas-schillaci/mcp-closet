@@ -31,15 +31,6 @@ export const widgetMetadata: WidgetMetadata = {
   description: "Display selected outfit images",
   props: propsSchema,
   exposeAsTool: false,
-  metadata: {
-    csp: {
-      resourceDomains: [
-        "https://images.pexels.com",
-        "https://images.unsplash.com",
-        "https://cdn.pixabay.com",
-      ],
-    },
-  },
 };
 
 type Props = z.infer<typeof propsSchema>;
