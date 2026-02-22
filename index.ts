@@ -156,6 +156,32 @@ function withImagePath(item: OutfitItem) {
   };
 }
 
+function getPublicBaseUrl() {
+  const baseUrl = process.env.MCP_URL || "http://localhost:3000";
+  const normalized = baseUrl.includes("0.0.0.0")
+    ? baseUrl.replace("0.0.0.0", "localhost")
+    : baseUrl;
+  return `${normalized}/mcp-use/public`;
+}
+
+function withImageUrl(item: OutfitItem) {
+  if (item.imagePath.startsWith("http://") || item.imagePath.startsWith("https://")) {
+    return {
+      id: item.id,
+      name: item.name,
+      description: item.description,
+      imageUrl: item.imagePath,
+    };
+  }
+  const publicBaseUrl = getPublicBaseUrl();
+  return {
+    id: item.id,
+    name: item.name,
+    description: item.description,
+    imageUrl: `${publicBaseUrl}${item.imagePath}`,
+  };
+}
+
 server.tool(
   {
     name: "show-outfit-images",
@@ -262,9 +288,9 @@ server.tool(
     }
 
     return object({
-      top: withImagePath(top),
-      bottom: withImagePath(bottom),
-      shoes: withImagePath(shoesItem),
+      top: withImageUrl(top),
+      bottom: withImageUrl(bottom),
+      shoes: withImageUrl(shoesItem),
     });
   }
 );
