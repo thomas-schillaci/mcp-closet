@@ -1,6 +1,6 @@
 import { MCPServer, error, object, text, widget } from "mcp-use/server";
-import { readdir } from "node:fs/promises";
-import { join } from "node:path";
+import { readdir, readFile } from "node:fs/promises";
+import { extname, join, normalize } from "node:path";
 import { z } from "zod";
 
 const server = new MCPServer({
@@ -10,6 +10,69 @@ const server = new MCPServer({
   description: "Outfit suggestion MCP server",
   baseUrl: process.env.MCP_URL || "http://localhost:3000",
   favicon: "favicon.ico",
+});
+
+const WIDGET_ROUTE_BASE = "/mcp-use/widgets/outfit-images";
+const WIDGET_DIST_DIR = join(
+  process.cwd(),
+  "dist",
+  "resources",
+  "widgets",
+  "outfit-images"
+);
+
+function getContentType(filePath: string) {
+  const ext = extname(filePath).toLowerCase();
+  switch (ext) {
+    case ".html":
+      return "text/html; charset=utf-8";
+    case ".js":
+      return "application/javascript; charset=utf-8";
+    case ".css":
+      return "text/css; charset=utf-8";
+    case ".json":
+      return "application/json; charset=utf-8";
+    case ".svg":
+      return "image/svg+xml";
+    case ".png":
+      return "image/png";
+    case ".jpg":
+    case ".jpeg":
+      return "image/jpeg";
+    case ".webp":
+      return "image/webp";
+    case ".map":
+      return "application/json; charset=utf-8";
+    default:
+      return "application/octet-stream";
+  }
+}
+
+async function serveWidgetFile(pathname: string) {
+  const relative = pathname.replace(WIDGET_ROUTE_BASE, "") || "/";
+  const normalized = normalize(relative).replace(/^(\.\.(\/|\\|$))+/, "");
+  const safePath = normalized === "/" ? "index.html" : normalized.replace(/^\/+/, "");
+  const filePath = join(WIDGET_DIST_DIR, safePath);
+  const data = await readFile(filePath);
+  return { data, contentType: getContentType(filePath) };
+}
+
+server.app.get(WIDGET_ROUTE_BASE, async (c) => {
+  try {
+    const { data, contentType } = await serveWidgetFile("/");
+    return c.body(data, 200, { "Content-Type": contentType });
+  } catch {
+    return c.text("Not Found", 404);
+  }
+});
+
+server.app.get(`${WIDGET_ROUTE_BASE}/*`, async (c) => {
+  try {
+    const { data, contentType } = await serveWidgetFile(c.req.path);
+    return c.body(data, 200, { "Content-Type": contentType });
+  } catch {
+    return c.text("Not Found", 404);
+  }
 });
 
 const runtimeBaseUrl =
