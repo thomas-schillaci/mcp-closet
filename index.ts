@@ -1,6 +1,4 @@
 import { MCPServer, error, object, text, widget } from "mcp-use/server";
-import { readdir, readFile } from "node:fs/promises";
-import { extname, join, normalize } from "node:path";
 import { z } from "zod";
 
 const server = new MCPServer({
@@ -12,141 +10,6 @@ const server = new MCPServer({
   favicon: "favicon.ico",
 });
 
-const WIDGET_ROUTE_BASE = "/mcp-use/widgets/outfit-images";
-const WIDGET_DIST_DIR = join(
-  process.cwd(),
-  "dist",
-  "resources",
-  "widgets",
-  "outfit-images"
-);
-
-function getContentType(filePath: string) {
-  const ext = extname(filePath).toLowerCase();
-  switch (ext) {
-    case ".html":
-      return "text/html; charset=utf-8";
-    case ".js":
-      return "application/javascript; charset=utf-8";
-    case ".css":
-      return "text/css; charset=utf-8";
-    case ".json":
-      return "application/json; charset=utf-8";
-    case ".svg":
-      return "image/svg+xml";
-    case ".png":
-      return "image/png";
-    case ".jpg":
-    case ".jpeg":
-      return "image/jpeg";
-    case ".webp":
-      return "image/webp";
-    case ".map":
-      return "application/json; charset=utf-8";
-    default:
-      return "application/octet-stream";
-  }
-}
-
-async function serveWidgetFile(pathname: string) {
-  const relative = pathname.replace(WIDGET_ROUTE_BASE, "") || "/";
-  const normalized = normalize(relative).replace(/^(\.\.(\/|\\|$))+/, "");
-  const safePath = normalized === "/" ? "index.html" : normalized.replace(/^\/+/, "");
-  const filePath = join(WIDGET_DIST_DIR, safePath);
-  const data = await readFile(filePath);
-  return { data, contentType: getContentType(filePath) };
-}
-
-server.app.get(WIDGET_ROUTE_BASE, async (c) => {
-  try {
-    const { data, contentType } = await serveWidgetFile("/");
-    return c.body(data, 200, { "Content-Type": contentType });
-  } catch {
-    return c.text("Not Found", 404);
-  }
-});
-
-server.app.get(`${WIDGET_ROUTE_BASE}/*`, async (c) => {
-  try {
-    const { data, contentType } = await serveWidgetFile(c.req.path);
-    return c.body(data, 200, { "Content-Type": contentType });
-  } catch {
-    return c.text("Not Found", 404);
-  }
-});
-
-const runtimeBaseUrl =
-  process.env.MCP_URL ||
-  process.env.MCP_BASE_URL ||
-  process.env.BASE_URL ||
-  "http://localhost:3000";
-
-server.tool(
-  {
-    name: "get-server-info",
-    description: "Return runtime URLs for debugging deployment issues",
-    schema: z.object({}),
-  },
-  async () =>
-    object({
-      baseUrl: runtimeBaseUrl,
-      publicBaseUrl: `${runtimeBaseUrl}/mcp-use/public`,
-      widgetBaseUrl: `${runtimeBaseUrl}/mcp-use/widgets/outfit-images`,
-      mcpEndpoint: `${runtimeBaseUrl}/mcp`,
-    })
-);
-
-server.tool(
-  {
-    name: "get-widget-status",
-    description: "List built widget files on the server for debugging",
-    schema: z.object({}),
-  },
-  async () => {
-    try {
-      const widgetDir = join(process.cwd(), "dist", "resources", "widgets");
-      const widgets = await readdir(widgetDir, { withFileTypes: true });
-      const widgetNames = widgets
-        .filter((entry) => entry.isDirectory())
-        .map((entry) => entry.name);
-      return object({
-        widgetDir,
-        widgetNames,
-      });
-    } catch (err) {
-      return error(
-        `Failed to read widget directory: ${
-          err instanceof Error ? err.message : "unknown error"
-        }`
-      );
-    }
-  }
-);
-
-server.tool(
-  {
-    name: "probe-widget-route",
-    description: "Probe the widget URL from the server to verify routing",
-    schema: z.object({}),
-  },
-  async () => {
-    const url = `${runtimeBaseUrl}/mcp-use/widgets/outfit-images/`;
-    try {
-      const response = await fetch(url, { method: "GET" });
-      const textSnippet = (await response.text()).slice(0, 200);
-      return object({
-        url,
-        status: response.status,
-        ok: response.ok,
-        textSnippet,
-      });
-    } catch (err) {
-      return error(
-        `Probe failed: ${err instanceof Error ? err.message : "unknown error"}`
-      );
-    }
-  }
-);
 
 type OutfitItem = {
   id: string;
@@ -154,6 +17,7 @@ type OutfitItem = {
   description: string;
   tags: string[];
   imagePath: string;
+  priceUsd: number;
 };
 
 const tops: OutfitItem[] = [
@@ -163,6 +27,7 @@ const tops: OutfitItem[] = [
     description: "Soft crewneck tee with a clean, minimal fit.",
     tags: ["casual", "street", "weekend"],
     imagePath: "/top-tshirt.jpg",
+    priceUsd: 28,
   },
   {
     id: "top-shirt",
@@ -170,6 +35,7 @@ const tops: OutfitItem[] = [
     description: "Crisp button-down with a structured collar.",
     tags: ["business", "smart-casual", "date"],
     imagePath: "/top-shirt.jpg",
+    priceUsd: 64,
   },
   {
     id: "top-pullover",
@@ -177,6 +43,7 @@ const tops: OutfitItem[] = [
     description: "Lightweight knit with refined texture.",
     tags: ["smart-casual", "winter", "work"],
     imagePath: "/top-pullover.png",
+    priceUsd: 78,
   },
   {
     id: "top-blazer",
@@ -184,6 +51,7 @@ const tops: OutfitItem[] = [
     description: "Sharp silhouette with a polished finish.",
     tags: ["gala", "formal", "cocktail", "business"],
     imagePath: "/top-blazer.jpg",
+    priceUsd: 180,
   },
   {
     id: "top-silk-blouse",
@@ -191,6 +59,7 @@ const tops: OutfitItem[] = [
     description: "Draped silk with a subtle sheen.",
     tags: ["gala", "formal", "cocktail", "date"],
     imagePath: "/top-silk-blouse.jpg",
+    priceUsd: 120,
   },
 ];
 
@@ -201,6 +70,7 @@ const bottoms: OutfitItem[] = [
     description: "Slim dark-wash denim with clean lines.",
     tags: ["casual", "street", "weekend"],
     imagePath: "/bottom-jeans.jpg",
+    priceUsd: 72,
   },
   {
     id: "bottom-chinos",
@@ -208,6 +78,7 @@ const bottoms: OutfitItem[] = [
     description: "Cotton twill with a modern tapered leg.",
     tags: ["smart-casual", "work", "date"],
     imagePath: "/bottom-chinos.jpg",
+    priceUsd: 68,
   },
   {
     id: "bottom-pleated-trousers",
@@ -215,6 +86,7 @@ const bottoms: OutfitItem[] = [
     description: "High-waist trousers with soft drape.",
     tags: ["formal", "gala", "business"],
     imagePath: "/bottom-pleated-trousers.jpg",
+    priceUsd: 110,
   },
   {
     id: "bottom-pencil-skirt",
@@ -222,6 +94,7 @@ const bottoms: OutfitItem[] = [
     description: "Structured skirt with a clean hem.",
     tags: ["business", "cocktail", "date"],
     imagePath: "/bottom-pencil-skirt.jpg",
+    priceUsd: 85,
   },
   {
     id: "bottom-floor-skirt",
@@ -229,6 +102,7 @@ const bottoms: OutfitItem[] = [
     description: "Elegant full-length skirt with movement.",
     tags: ["gala", "formal"],
     imagePath: "/bottom-floor-skirt.jpg",
+    priceUsd: 140,
   },
 ];
 
@@ -239,6 +113,7 @@ const shoes: OutfitItem[] = [
     description: "Clean leather sneakers for everyday wear.",
     tags: ["casual", "street", "weekend"],
     imagePath: "/shoes-sneakers.jpg",
+    priceUsd: 95,
   },
   {
     id: "shoes-loafers",
@@ -246,6 +121,7 @@ const shoes: OutfitItem[] = [
     description: "Classic loafers with a sleek profile.",
     tags: ["smart-casual", "work", "date"],
     imagePath: "/shoes-loafers.jpg",
+    priceUsd: 130,
   },
   {
     id: "shoes-oxfords",
@@ -253,6 +129,7 @@ const shoes: OutfitItem[] = [
     description: "Formal lace-ups with a glossy finish.",
     tags: ["formal", "gala", "business"],
     imagePath: "/shoes-oxfords.jpg",
+    priceUsd: 150,
   },
   {
     id: "shoes-heels",
@@ -260,6 +137,7 @@ const shoes: OutfitItem[] = [
     description: "Pointed-toe heels for evening looks.",
     tags: ["cocktail", "gala", "formal"],
     imagePath: "/shoes-heels.jpg",
+    priceUsd: 120,
   },
   {
     id: "shoes-ankle-boots",
@@ -267,6 +145,7 @@ const shoes: OutfitItem[] = [
     description: "Sleek boots with a modest heel.",
     tags: ["smart-casual", "winter", "date"],
     imagePath: "/shoes-ankle-boots.jpg",
+    priceUsd: 135,
   },
 ];
 
@@ -291,6 +170,7 @@ function withImagePath(item: OutfitItem) {
     name: item.name,
     description: item.description,
     imagePath: item.imagePath,
+    priceUsd: item.priceUsd,
   };
 }
 
@@ -326,10 +206,6 @@ server.tool(
     description:
       "Show selected outfit images in a widget for a given occasion",
     schema: z.object({
-      occasion: z
-        .string()
-        .optional()
-        .describe("Occasion (e.g., gala, business, date, casual)"),
       topId: z.string().describe("Selected top id"),
       bottomId: z.string().describe("Selected bottom id"),
       shoesId: z.string().describe("Selected shoes id"),
@@ -340,7 +216,10 @@ server.tool(
       invoked: "Outfit images ready",
     },
   },
-  async ({ occasion, topId, bottomId, shoesId }) => {
+  async ({ topId, bottomId, shoesId }) => {
+    const topOptions = tops;
+    const bottomOptions = bottoms;
+    const shoesOptions = shoes;
     const top = allItems.find((item) => item.id === topId);
     const bottom = allItems.find((item) => item.id === bottomId);
     const shoesItem = allItems.find((item) => item.id === shoesId);
@@ -353,10 +232,14 @@ server.tool(
 
     return widget({
       props: {
-        occasion,
-        top: withImagePath(top),
-        bottom: withImagePath(bottom),
-        shoes: withImagePath(shoesItem),
+        selected: {
+          topId,
+          bottomId,
+          shoesId,
+        },
+        tops: topOptions.map(withImagePath),
+        bottoms: bottomOptions.map(withImagePath),
+        shoes: shoesOptions.map(withImagePath),
       },
       output: text("Outfit images ready"),
     });
