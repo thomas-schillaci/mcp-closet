@@ -10,6 +10,27 @@ const server = new MCPServer({
   favicon: "favicon.ico",
 });
 
+const runtimeBaseUrl =
+  process.env.MCP_URL ||
+  process.env.MCP_BASE_URL ||
+  process.env.BASE_URL ||
+  "http://localhost:3000";
+
+server.tool(
+  {
+    name: "get-server-info",
+    description: "Return runtime URLs for debugging deployment issues",
+    schema: z.object({}),
+  },
+  async () =>
+    object({
+      baseUrl: runtimeBaseUrl,
+      publicBaseUrl: `${runtimeBaseUrl}/mcp-use/public`,
+      widgetBaseUrl: `${runtimeBaseUrl}/mcp-use/widgets/outfit-images`,
+      mcpEndpoint: `${runtimeBaseUrl}/mcp`,
+    })
+);
+
 type OutfitItem = {
   id: string;
   name: string;
