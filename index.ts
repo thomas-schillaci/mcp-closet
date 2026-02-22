@@ -1,4 +1,6 @@
 import { MCPServer, error, object, text, widget } from "mcp-use/server";
+import { readdir } from "node:fs/promises";
+import { join } from "node:path";
 import { z } from "zod";
 
 const server = new MCPServer({
@@ -29,6 +31,33 @@ server.tool(
       widgetBaseUrl: `${runtimeBaseUrl}/mcp-use/widgets/outfit-images`,
       mcpEndpoint: `${runtimeBaseUrl}/mcp`,
     })
+);
+
+server.tool(
+  {
+    name: "get-widget-status",
+    description: "List built widget files on the server for debugging",
+    schema: z.object({}),
+  },
+  async () => {
+    try {
+      const widgetDir = join(process.cwd(), "dist", "resources", "widgets");
+      const widgets = await readdir(widgetDir, { withFileTypes: true });
+      const widgetNames = widgets
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => entry.name);
+      return object({
+        widgetDir,
+        widgetNames,
+      });
+    } catch (err) {
+      return error(
+        `Failed to read widget directory: ${
+          err instanceof Error ? err.message : "unknown error"
+        }`
+      );
+    }
+  }
 );
 
 type OutfitItem = {
